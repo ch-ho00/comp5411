@@ -778,6 +778,7 @@ void Viewer3D::buildDeformMat() {
 	if (mMesh == nullptr) {
 		return;
 	}
+	// std::cout << "buildDeformMat \n";
 	mMesh->groupingVertexFlags();
 	mDeformer->setMesh(mMesh);
 }
