@@ -56,6 +56,18 @@ void Deformer::buildSystemMat() {
 	Eigen::MatrixXd x (n_vert, 3);
 	std::vector< Eigen::Triplet<double> > triplets;
 
+	Eigen::Vector3f p1 = Eigen::Vector3f::Zero();
+	Eigen::Vector3f p2 = Eigen::Vector3f::Zero();
+	Eigen::Vector3f p3 = Eigen::Vector3f::Zero();
+
+	Eigen::Vector3f hedge_1;
+	Eigen::Vector3f hedge_2;
+	Eigen::Vector3f hedge_3;
+	Eigen::Vector3f hedge_4;
+
+	double cot1;
+	double cot2;
+
 	for (int i = 0; i < n_vert ; i ++){
 		Vertex* curr_v = mMesh->vertices()[i];
 		std::vector< HEdge* > adjHEdgeList;
@@ -64,12 +76,37 @@ void Deformer::buildSystemMat() {
 		while (curr_e = orhe.nextHEdge())
 			adjHEdgeList.push_back(curr_e);
 
+		float sum_w = 0.0;
+		std::vector < float > ws;
+		// calculate weight
+		for (int j = 0; j < adjHEdgeList.size(); j++) {
+			HEdge* outHEdge = adjHEdgeList[j];
+			p1 = outHEdge->end()->position();
+			p2 = outHEdge->next()->end()->position();
+			p3 = outHEdge->next()->next()->end()->position();
+			hedge_1 = p1 - p2;
+			hedge_2 = p3 - p2;
+			cot1 = hedge_1.dot(hedge_2) / hedge_1.cross(hedge_2).norm();
+
+			HEdge* inHEdge = outHEdge->twin();
+			p1 = inHEdge->end()->position();
+			p2 = inHEdge->next()->end()->position();
+			p3 = inHEdge->next()->next()->end()->position();
+
+			hedge_3 = p1 - p2;
+			hedge_4 = p3 - p2;
+			cot2 = hedge_3.dot(hedge_4) / hedge_3.cross(hedge_4).norm();
+
+			sum_w += (cot1 + cot2) / 2;
+			ws.push_back((cot1 + cot2) / 2);
+		}
+
 		curr_pos = curr_v->position();
 		x.row(i) = curr_pos.cast<double>();
 
 		triplets.push_back(Eigen::Triplet<double>(curr_v->index(), curr_v->index(),1));
 		for (int j = 0 ; j < adjHEdgeList.size(); j++)
-			triplets.push_back(Eigen::Triplet<double>(curr_v->index(), adjHEdgeList[j]->end()->index(),-1.0/adjHEdgeList.size()));		
+			triplets.push_back(Eigen::Triplet<double>(curr_v->index(), adjHEdgeList[j]->end()->index(),-ws[j] / sum_w));		
 	}
 
 	for (int i =0 ; i < n_constraint; i ++){
