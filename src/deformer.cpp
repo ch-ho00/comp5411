@@ -73,6 +73,7 @@ void Deformer::buildSystemMat() {
 		std::vector< HEdge* > adjHEdgeList;
 		OneRingHEdge orhe(curr_v);
 		HEdge* curr_e = nullptr;
+		// collect neighbours
 		while (curr_e = orhe.nextHEdge())
 			adjHEdgeList.push_back(curr_e);
 
@@ -96,7 +97,7 @@ void Deformer::buildSystemMat() {
 			hedge_3 = p1 - p2;
 			hedge_4 = p3 - p2;
 			cot2 = hedge_3.dot(hedge_4) / hedge_3.cross(hedge_4).norm();
-
+			// sum of cotangent weights 
 			sum_w += (cot1 + cot2) / 2;
 			ws.push_back((cot1 + cot2) / 2);
 		}
@@ -104,11 +105,15 @@ void Deformer::buildSystemMat() {
 		curr_pos = curr_v->position();
 		x.row(i) = curr_pos.cast<double>();
 
+		// set diagonal element as 1 
 		triplets.push_back(Eigen::Triplet<double>(curr_v->index(), curr_v->index(),1));
+
+		// set non-diagonal element as cotangent weight 
 		for (int j = 0 ; j < adjHEdgeList.size(); j++)
 			triplets.push_back(Eigen::Triplet<double>(curr_v->index(), adjHEdgeList[j]->end()->index(),-ws[j] / sum_w));		
 	}
 
+	// set modelling constraints
 	for (int i =0 ; i < n_constraint; i ++){
 		int constraint_col = mRoiList[i]->index();
 		triplets.push_back(Eigen::Triplet<double>(n_vert + i, constraint_col, 1));				
@@ -139,7 +144,7 @@ void Deformer::deform() {
 	int n_vert = mMesh->vertices().size();
 	int n_constraint =  mRoiList.size();
 
-	// // Constraint part
+	// Set modeliing constraint value
 	for (int v_idx = 0; v_idx < n_constraint; v_idx++) {
 		Vertex* curr_v = mRoiList[v_idx];
 		Eigen::Vector3f v_pos = curr_v->position();
@@ -147,8 +152,10 @@ void Deformer::deform() {
 
 	}
 	Eigen::MatrixXd updated_x; 
+	// Solve linear system
 	updated_x = mCholeskySolver->solve( A_.transpose() * b_);
 
+	// Update vertices location
 	for(int r_idx = 0; r_idx < n_vert; r_idx++) 
 		mMesh->vertices()[r_idx]->setPosition(updated_x.row(r_idx).cast<float>());
 
